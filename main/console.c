@@ -30,8 +30,8 @@ void app_console_init(void)
     // Console settings
     esp_console_repl_config_t repl_cfg = ESP_CONSOLE_REPL_CONFIG_DEFAULT();
     repl_cfg.prompt = PROMPT_STR ">";
-    repl_cfg.max_cmdline_length = CONFIG_CONSOLE_MAX_COMMAND_LINE_LENGTH;
-
+    //repl_cfg.max_cmdline_length = CONFIG_CONSOLE_MAX_COMMAND_LINE_LENGTH;
+    repl_cfg.max_cmdline_length = 256;
     // Register basic commands
     esp_console_register_help_command();
     register_system_common();

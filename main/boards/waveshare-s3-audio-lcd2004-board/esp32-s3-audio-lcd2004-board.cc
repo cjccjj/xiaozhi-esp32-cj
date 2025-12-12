@@ -1,0 +1,193 @@
+#include "wifi_board.h"
+#include "codecs/box_audio_codec.h"
+#include "char_lcd_display.h"
+#include "system_reset.h"
+#include "application.h"
+#include "button.h"
+#include "config.h"
+
+#include <esp_log.h>
+#include "i2c_device.h"  
+#include <driver/i2c_master.h>
+#include <driver/ledc.h>
+#include <esp_timer.h>
+#include "esp_io_expander_tca95xx_16bit.h"
+#include "esp32_camera.h"
+#include "led/circular_strip.h"
+
+#define TAG "waveshare_s3_audio_lcd2004_board"
+
+#define LCD_OPCODE_WRITE_CMD        (0x02ULL)
+#define LCD_OPCODE_READ_CMD         (0x0BULL)
+#define LCD_OPCODE_WRITE_COLOR      (0x32ULL)
+
+
+class CustomBoard : public WifiBoard {
+private:
+    Button boot_button_;
+    i2c_master_bus_handle_t i2c_bus_;      // I2C0 - general devices
+    //i2c_master_bus_handle_t lcd_i2c_bus_;  // I2C1 - LCD 2004 display
+    esp_io_expander_handle_t io_expander = NULL;
+    CharLcdDisplay* display_;
+    //Esp32Camera* camera_;
+
+    // -------------------------------
+    // Initialize regular I2C (bus 0)
+    // -------------------------------
+    void InitializeI2c() {
+        i2c_master_bus_config_t i2c_bus_cfg = {
+            .i2c_port = (i2c_port_t)0,
+            .sda_io_num = I2C_SDA_IO,
+            .scl_io_num = I2C_SCL_IO,
+            .clk_source = I2C_CLK_SRC_DEFAULT,
+        };
+        ESP_ERROR_CHECK(i2c_new_master_bus(&i2c_bus_cfg, &i2c_bus_));
+    }
+
+    // ---------------------------------
+    // Initialize secondary I2C (bus 1)
+    // ---------------------------------
+    // void InitializeLcdI2c() {
+    //     i2c_master_bus_config_t lcd_i2c_cfg = {
+    //         .i2c_port = I2C_NUM_1,
+    //         .sda_io_num = LCD_I2C_SDA,
+    //         .scl_io_num = LCD_I2C_SCL,
+    //         .clk_source = I2C_CLK_SRC_DEFAULT,
+    //         .glitch_ignore_cnt = 7,
+    //         .intr_priority = 0,
+    //         .trans_queue_depth = 5,
+    //         .flags = { .enable_internal_pullup = 1, .allow_pd = 0 },
+    //     };
+    //     ESP_ERROR_CHECK(i2c_new_master_bus(&lcd_i2c_cfg, &lcd_i2c_bus_));
+    // }
+
+    void InitializeTca9555(void)
+    {
+        esp_err_t ret = esp_io_expander_new_i2c_tca95xx_16bit(i2c_bus_, I2C_ADDRESS, &io_expander);  
+        if(ret != ESP_OK)
+            ESP_LOGE(TAG, "TCA9554 create returned error");                                                                                  // 打印引脚状态
+
+        ret = esp_io_expander_set_dir(io_expander, IO_EXPANDER_PIN_NUM_0 | IO_EXPANDER_PIN_NUM_1 | IO_EXPANDER_PIN_NUM_8|IO_EXPANDER_PIN_NUM_5|IO_EXPANDER_PIN_NUM_6, IO_EXPANDER_OUTPUT);                 // 设置引脚 EXIO0 和 EXIO1 模式为输出
+        ESP_ERROR_CHECK(ret);
+        ret = esp_io_expander_set_level(io_expander, IO_EXPANDER_PIN_NUM_0 | IO_EXPANDER_PIN_NUM_1, 1);                                // 复位 LCD 与 TouchPad
+        ESP_ERROR_CHECK(ret);
+        vTaskDelay(pdMS_TO_TICKS(10));
+        ret = esp_io_expander_set_level(io_expander, IO_EXPANDER_PIN_NUM_0 | IO_EXPANDER_PIN_NUM_1, 0);                                // 复位 LCD 与 TouchPad
+        ESP_ERROR_CHECK(ret);
+        vTaskDelay(pdMS_TO_TICKS(10));
+        ret = esp_io_expander_set_level(io_expander, IO_EXPANDER_PIN_NUM_0 | IO_EXPANDER_PIN_NUM_1, 1);                                // 复位 LCD 与 TouchPad
+        ESP_ERROR_CHECK(ret);
+        ret = esp_io_expander_set_level(io_expander, IO_EXPANDER_PIN_NUM_8, 1);                                                         // 启用喇叭功放
+        ret = esp_io_expander_set_level(io_expander, IO_EXPANDER_PIN_NUM_5, false);                                                     // 复位摄像头
+        vTaskDelay(pdMS_TO_TICKS(5));
+        ret = esp_io_expander_set_level(io_expander, IO_EXPANDER_PIN_NUM_6, true); 
+        vTaskDelay(pdMS_TO_TICKS(5));
+        ESP_ERROR_CHECK(ret);
+    }
+
+    // void InitializeSpi() {
+    //     spi_bus_config_t buscfg = {};
+    //     buscfg.mosi_io_num = DISPLAY_MOSI_PIN;
+    //     buscfg.miso_io_num = GPIO_NUM_NC;
+    //     buscfg.sclk_io_num = DISPLAY_SCLK_PIN;
+    //     buscfg.quadwp_io_num = GPIO_NUM_NC;
+    //     buscfg.quadhd_io_num = GPIO_NUM_NC;
+    //     buscfg.max_transfer_sz = DISPLAY_WIDTH * DISPLAY_HEIGHT * sizeof(uint16_t);
+    //     ESP_ERROR_CHECK(spi_bus_initialize(SPI2_HOST, &buscfg, SPI_DMA_CH_AUTO));
+    // }
+
+    void InitializeButtons() {
+        boot_button_.OnClick([this]() {
+            auto& app = Application::GetInstance();
+            if (app.GetDeviceState() == kDeviceStateStarting) {
+                EnterWifiConfigMode();
+                return;
+            }
+            app.ToggleChatState();
+        });
+    }
+
+    // void InitializeCamera() {
+    //     static esp_cam_ctlr_dvp_pin_config_t dvp_pin_config = {
+    //         .data_width = CAM_CTLR_DATA_WIDTH_8,
+    //         .data_io = {
+    //             [0] = CAMERA_PIN_D0, [1] = CAMERA_PIN_D1, [2] = CAMERA_PIN_D2, [3] = CAMERA_PIN_D3,
+    //             [4] = CAMERA_PIN_D4, [5] = CAMERA_PIN_D5, [6] = CAMERA_PIN_D6, [7] = CAMERA_PIN_D7,
+    //         },
+    //         .vsync_io = CAMERA_PIN_VSYNC,
+    //         .de_io = CAMERA_PIN_HREF,
+    //         .pclk_io = CAMERA_PIN_PCLK,
+    //         .xclk_io = CAMERA_PIN_XCLK,
+    //     };
+
+    //     esp_video_init_sccb_config_t sccb_config = {
+    //         .init_sccb = false,
+    //         .i2c_handle = i2c_bus_,
+    //         .freq = 100000,
+    //     };
+
+    //     esp_video_init_dvp_config_t dvp_config = {
+    //         .sccb_config = sccb_config,
+    //         .reset_pin = CAMERA_PIN_RESET,
+    //         .pwdn_pin = CAMERA_PIN_PWDN,
+    //         .dvp_pin = dvp_pin_config,
+    //         .xclk_freq = 12000000,
+    //     };
+
+    //     esp_video_init_config_t video_config = {
+    //         .dvp = &dvp_config,
+    //     };
+
+    //     camera_ = new Esp32Camera(video_config);
+    // }
+
+public:
+    CustomBoard():
+        boot_button_(BOOT_BUTTON_GPIO) {
+        InitializeI2c();
+        InitializeTca9555();
+        //InitializeSpi();
+        InitializeButtons();
+        //InitializeLcdI2c();
+
+        // Character LCD on I2C1
+        display_ = new CharLcdDisplay(
+            I2C_NUM_1,        // bus number
+            LCD_I2C_SDA,      // SDA pin
+            LCD_I2C_SCL,      // SCL pin
+            0x27,             // LCD I2C address
+            20,               // columns
+            4                 // rows
+        );
+
+        //InitializeCamera();
+
+        //  GetBacklight()->RestoreBrightness();
+    }
+
+    virtual Led* GetLed() override {
+        static CircularStrip led(BUILTIN_LED_GPIO, 6);
+        return &led;
+    }
+
+    virtual AudioCodec* GetAudioCodec() override {
+        static BoxAudioCodec audio_codec(i2c_bus_, AUDIO_INPUT_SAMPLE_RATE, AUDIO_OUTPUT_SAMPLE_RATE,
+            AUDIO_I2S_GPIO_MCLK, AUDIO_I2S_GPIO_BCLK, AUDIO_I2S_GPIO_WS, AUDIO_I2S_GPIO_DOUT, AUDIO_I2S_GPIO_DIN, AUDIO_CODEC_PA_PIN, AUDIO_CODEC_ES8311_ADDR, AUDIO_CODEC_ES7210_ADDR, AUDIO_INPUT_REFERENCE);
+            return &audio_codec;
+    }
+
+    virtual Display* GetDisplay() override {
+        return display_;
+    }
+    
+    // virtual Backlight* GetBacklight() override {
+    //     static PwmBacklight backlight(DISPLAY_BACKLIGHT_PIN, BACKLIGHT_INVERT);
+    //     return &backlight;
+    // }
+
+    // virtual Camera* GetCamera() override {
+    //     return camera_;
+    // }
+};
+
+DECLARE_BOARD(CustomBoard);

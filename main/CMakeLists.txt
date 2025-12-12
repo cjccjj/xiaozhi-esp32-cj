@@ -36,6 +36,7 @@ set(SOURCES "audio/audio_codec.cc"
             "device_state_machine.cc"
             "assets.cc"
             "main.cc"
+            "console.c"
             )
 
 set(INCLUDE_DIRS "." "display" "display/lvgl_display" "display/lvgl_display/jpg" "audio" "protocols")
@@ -219,6 +220,11 @@ elseif(CONFIG_BOARD_TYPE_ESP_SENSAIRSHUTTLE)
     set(DEFAULT_EMOJI_COLLECTION twemoji_32)
 elseif(CONFIG_BOARD_TYPE_WAVESHARE_S3_AUDIO_BOARD)
     set(BOARD_TYPE "waveshare-s3-audio-board")
+    set(BUILTIN_TEXT_FONT font_puhui_basic_16_4)
+    set(BUILTIN_ICON_FONT font_awesome_16_4)
+    set(DEFAULT_EMOJI_COLLECTION twemoji_32)
+elseif(CONFIG_BOARD_TYPE_WAVESHARE_S3_AUDIO_LCD2004_BOARD)
+    set(BOARD_TYPE "waveshare-s3-audio-lcd2004-board")
     set(BUILTIN_TEXT_FONT font_puhui_basic_16_4)
     set(BUILTIN_ICON_FONT font_awesome_16_4)
     set(DEFAULT_EMOJI_COLLECTION twemoji_32)

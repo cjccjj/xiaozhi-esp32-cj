@@ -115,3 +115,6 @@ dependencies:
   idf:
     version: '>=5.4.0'
   espressif/esp_lcd_touch_st7123: ^1.0.0
+  esp-idf-lib/hd44780: ^1.2.7
+  esp-idf-lib/esp_idf_lib_helpers: ^1.0.4
+  esp-idf-lib/pcf8574: ^1.0.8
