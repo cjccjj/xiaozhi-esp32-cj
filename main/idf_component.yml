@@ -1,5 +1,12 @@
 ## IDF Component Manager Manifest File
 dependencies:
+  cmd_system:
+    path: ${IDF_PATH}/examples/system/console/advanced/components/cmd_system
+  cmd_nvs:
+    path: ${IDF_PATH}/examples/system/console/advanced/components/cmd_nvs
+  cmd_wifi:
+    path: ${IDF_PATH}/examples/system/console/advanced/components/cmd_wifi
+
   waveshare/esp_lcd_sh8601: 1.0.2
   espressif/esp_lcd_ili9341: ==1.2.0
   espressif/esp_lcd_gc9a01: ==2.0.1
