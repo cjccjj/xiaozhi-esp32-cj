@@ -138,19 +138,23 @@ void lcd_init(void) {
         vTaskDelay(pdMS_TO_TICKS(5));
     }
 
-    static const uint8_t frame1[8] = {0x00, 0x00, 0x00, 0x0E, 0x11, 0x11, 0x11, 0x0E}; //o 1
+    static const uint8_t frame1[8] = {0x00, 0x00, 0x00, 0x0E, 0x11, 0x11, 0x11, 0x0E}; //1 not working
     static const uint8_t frame2[8] = {0x00, 0x00, 0x0E, 0x11, 0x11, 0x11, 0x0E, 0x00}; //2
     static const uint8_t frame3[8] = {0x00, 0x0E, 0x11, 0x11, 0x11, 0x0E, 0x00, 0x00}; //3
     static const uint8_t frame4[8] = {0x0E, 0x11, 0x11, 0x11, 0x0E, 0x00, 0x00, 0x00}; //4
-    const uint8_t* frames[4] = {frame1, frame2, frame3, frame4};
-    for (uint8_t slot = 0; slot < 4; ++slot) {
+    static const uint8_t frame5[8] = {0x1F, 0x1F, 0x1F, 0x1F, 0x1F, 0x1F, 0x1F, 0x1F}; //5
+    static const uint8_t frame6[8] = {0x1F, 0x1F, 0x1F, 0x1F, 0x1F, 0x1F, 0x1F, 0x1F}; //6
+    static const uint8_t frame7[8] = {0x1F, 0x1F, 0x1F, 0x1F, 0x1F, 0x1F, 0x1F, 0x1F}; //7
+    static const uint8_t frame8[8] = {0x00, 0x00, 0x00, 0x0E, 0x11, 0x11, 0x11, 0x0E}; //8 same as 1 
+
+    const uint8_t* frames[8] = {frame1, frame2, frame3, frame4, frame5, frame6, frame7, frame8};
+    for (uint8_t slot = 0; slot < 8; ++slot) {
         uint8_t addr = (uint8_t)(0x40 | (slot << 3));
         ESP_ERROR_CHECK(i2c_send_byte_on_4bits(addr, LCD_RS_CMD));
         vTaskDelay(pdMS_TO_TICKS(5));
         for (uint8_t row = 0; row < 8; ++row) {
             ESP_ERROR_CHECK(i2c_send_byte_on_4bits(frames[slot][row], LCD_RS_DATA));
             vTaskDelay(pdMS_TO_TICKS(5));
-
         }
     }
     ESP_ERROR_CHECK(i2c_send_byte_on_4bits(0x80, LCD_RS_CMD));

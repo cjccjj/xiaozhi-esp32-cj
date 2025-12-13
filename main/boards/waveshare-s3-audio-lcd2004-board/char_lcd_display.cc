@@ -5,6 +5,7 @@
 #include <vector>
 #include <esp_log.h>
 #include "application.h"
+#include "assets/lang_config.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
@@ -13,23 +14,7 @@
 
 static const char *TAG = "CharLcdDisplay";
 
-static inline bool hd44780_is_supported(char ch) {
-    return ch >= 32 && ch <= 127;
-}
-
-static inline char hd44780_sanitize_char(char ch) {
-    if (!hd44780_is_supported(ch)) return ' ';
-    switch (ch) {
-        case '\\':
-            return '|';
-        case '~':
-            return ' ';
-        default:
-            return ch;
-    }
-}
-
-static std::string lcd_filter_text(const char* content) {
+static std::string lcd_filter_all(const char* content) {
     if (content == nullptr) return std::string();
     const unsigned char* s = reinterpret_cast<const unsigned char*>(content);
     size_t n = std::strlen(content);
@@ -39,14 +24,11 @@ static std::string lcd_filter_text(const char* content) {
     while (i < n) {
         unsigned char b0 = s[i];
         if (b0 < 0x80) {
-            char ch;
-            if (b0 == '\n' || b0 == '\r' || b0 == '\t') {
-                ch = ' ';
-            } else if (b0 < 32 || b0 > 127) {
-                ch = ' ';
-            } else {
-                ch = hd44780_sanitize_char(static_cast<char>(b0));
-            }
+            char ch = static_cast<char>(b0);
+            if (b0 == '\n' || b0 == '\r' || b0 == '\t') ch = ' ';
+            if (b0 > 127) ch = ' ';
+            if (ch == '\\') ch = '|';
+            if (ch == '~') ch = ' ';
             out.push_back(ch);
             i++;
         } else if (b0 >= 0xE0 && b0 <= 0xEF && i + 2 < n) {
@@ -59,7 +41,9 @@ static std::string lcd_filter_text(const char* content) {
                 else if (cp == 0x201C || cp == 0x201D) ch = '"';
                 else if (cp == 0x2013 || cp == 0x2014) ch = '-';
                 else if (cp == 0x2026) ch = '_';
-                out.push_back(hd44780_sanitize_char(ch));
+                if (ch == '\\') ch = '|';
+                if (ch == '~') ch = ' ';
+                out.push_back(ch);
                 i += 3;
             } else {
                 out.push_back(' ');
@@ -127,10 +111,7 @@ CharLcdDisplay::~CharLcdDisplay()
 void CharLcdDisplay::SetChatMessage(const char * /*role*/, const char *content)
 {
     if (!content) { SendClear(); return; }
-    std::string filtered = lcd_filter_text(content);
-    for (size_t k = 0; k < filtered.size(); ++k) {
-        filtered[k] = hd44780_sanitize_char(filtered[k]);
-    }
+    std::string filtered = lcd_filter_all(content);
 
     SendClear();
     SendShow(filtered.c_str(), 0, 0);
@@ -138,8 +119,11 @@ void CharLcdDisplay::SetChatMessage(const char * /*role*/, const char *content)
 
 void CharLcdDisplay::SetStatus(const char* status)
 {
-    std::string filtered = lcd_filter_text(status ? status : "");
-    for (size_t k = 0; k < filtered.size(); ++k) filtered[k] = hd44780_sanitize_char(filtered[k]);
+    if (status && std::strcmp(status, Lang::Strings::LISTENING) == 0) {
+        SendAnimation("listening", -1, -1);
+        return;
+    }
+    std::string filtered = lcd_filter_all(status ? status : "");
     SendShow(filtered.c_str(), 0, 0);
 }
 
@@ -150,8 +134,7 @@ void CharLcdDisplay::ShowNotification(const std::string& notification, int durat
 
 void CharLcdDisplay::ShowNotification(const char* notification, int /*duration_ms*/)
 {
-    std::string filtered = lcd_filter_text(notification ? notification : "");
-    for (size_t k = 0; k < filtered.size(); ++k) filtered[k] = hd44780_sanitize_char(filtered[k]);
+    std::string filtered = lcd_filter_all(notification ? notification : "");
     SendShow(filtered.c_str(), 1, 0);
 }
 
@@ -201,12 +184,20 @@ void CharLcdDisplay::SendShow(const char* text, int row, int col) {
     DisplayMsg msg{};
     msg.row = row;
     msg.col = col;
-    std::string filtered = lcd_filter_text(text);
-    for (size_t k = 0; k < filtered.size(); ++k) {
-        filtered[k] = hd44780_sanitize_char(filtered[k]);
-    }
+    std::string filtered = lcd_filter_all(text);
     size_t n = std::min<size_t>(sizeof(msg.text) - 1, filtered.size());
     std::memcpy(msg.text, filtered.data(), n);
+    msg.text[n] = '\0';
+    xQueueSend(display_queue_, &msg, 0);
+}
+
+void CharLcdDisplay::SendAnimation(const char* name, int row, int col) {
+    if (!display_queue_ || !name) return;
+    DisplayMsg msg{};
+    msg.row = row;
+    msg.col = col;
+    size_t n = std::min<size_t>(sizeof(msg.text) - 1, std::strlen(name));
+    std::memcpy(msg.text, name, n);
     msg.text[n] = '\0';
     xQueueSend(display_queue_, &msg, 0);
 }
@@ -228,6 +219,25 @@ void CharLcdDisplay::DisplayTask(void* arg) {
                     self->cursor_col_ = msg.col;
                     lcd_set_cursor((uint8_t)self->cursor_col_, (uint8_t)self->cursor_row_);
                 }
+                continue;
+            }
+            if (std::strcmp(msg.text, "listening") == 0) {
+                int r = (msg.row >= 0 && msg.row < self->rows_) ? msg.row : self->cursor_row_;
+                int c = (msg.col >= 0 && msg.col < self->cols_) ? msg.col : self->cursor_col_;
+                const uint8_t seq[6] = {8,1,2,3,2,1};
+                for (int l = 0; l < 20; ++l) { //max 20 loops, 40 sec.
+                    for (int f = 0; f < 6; ++f) {
+                        lcd_set_cursor((uint8_t)c, (uint8_t)r);
+                        char s[2] = { (char)seq[f], 0 };
+                        lcd_write_string(s);
+                        // wait 300ms each frame but in chunks so more responsive
+                        for (int delay_chunk = 0; delay_chunk < 6; ++delay_chunk) {
+                            vTaskDelay(pdMS_TO_TICKS(50));
+                            if (uxQueueMessagesWaiting(self->display_queue_) > 0) goto end_animation;
+                        }
+                    }
+                }
+                end_animation:   
                 continue;
             }
             if (msg.row >= 0 && msg.row < self->rows_ && msg.col >= 0 && msg.col < self->cols_) {
