@@ -2,17 +2,13 @@
 #include <algorithm>
 #include <cstring>
 #include <string>
-#include <vector>
 #include <esp_log.h>
 #include "application.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/queue.h"
 #include <ctime>
 
-// -----------------------------------------------------------------------------
-// Global handle used by LCD I2C write callback
-// -----------------------------------------------------------------------------
-static volatile uint32_t g_message_token = 0;
 
 static const char *TAG = "CharLcdDisplay";
 
@@ -111,117 +107,39 @@ CharLcdDisplay::CharLcdDisplay(i2c_port_num_t i2c_port,
 
     ESP_LOGI(TAG, "LCD initialized successfully");
 
-    lcd_mutex_ = xSemaphoreCreateMutex();
-
+    display_queue_ = xQueueCreate(10, sizeof(DisplayMsg));
+    xTaskCreate(&CharLcdDisplay::DisplayTask, "charlcd_display", 3072, this, 5, &display_task_handle_);
 }
 
 CharLcdDisplay::~CharLcdDisplay()
 {
-    if (lcd_mutex_) {
-        vSemaphoreDelete(lcd_mutex_);
-        lcd_mutex_ = nullptr;
+    if (display_task_handle_) {
+        vTaskDelete(display_task_handle_);
+        display_task_handle_ = nullptr;
+    }
+    if (display_queue_) {
+        vQueueDelete(display_queue_);
+        display_queue_ = nullptr;
     }
 }
 
 void CharLcdDisplay::SetChatMessage(const char * /*role*/, const char *content)
 {
-    if (!content) { if (Lock(50)) { lcd_clear(); Unlock(); } return; }
+    if (!content) { SendClear(); return; }
     std::string filtered = lcd_filter_text(content);
     for (size_t k = 0; k < filtered.size(); ++k) {
         filtered[k] = hd44780_sanitize_char(filtered[k]);
     }
 
-    std::vector<std::string> lines;
-    lines.reserve((filtered.size() + cols_ - 1) / cols_);
-    for (size_t off = 0; off < filtered.size(); off += cols_) {
-        lines.emplace_back(filtered.substr(off, std::min(static_cast<size_t>(cols_), filtered.size() - off)));
-    }
-
-    if (!Lock(200)) { return; }
-    lcd_clear();
-    vTaskDelay(pdMS_TO_TICKS(2));
-    int delay_ms = 20;
-    int initial_rows = std::min(rows_, static_cast<int>(lines.size()));
-    uint32_t my_token = g_message_token + 1;
-    g_message_token = my_token;
-    for (int r = 0; r < initial_rows; ++r) {
-        lcd_set_cursor(0, r);
-        vTaskDelay(pdMS_TO_TICKS(1));
-        const auto &ln = lines[r];
-        for (size_t i = 0; i < ln.size(); ++i) {
-            char s[2] = { hd44780_sanitize_char(ln[i]), 0 };
-            lcd_write_string(s);
-            vTaskDelay(pdMS_TO_TICKS(delay_ms));
-        }
-        for (int c = static_cast<int>(ln.size()); c < cols_; ++c) {
-            char s[2] = { ' ', 0 };
-            lcd_write_string(s);
-        }
-        //vTaskDelay(pdMS_TO_TICKS(delay_ms));
-        if (my_token != g_message_token) { Unlock(); return; }
-    }
-    for (int r = initial_rows; r < rows_; ++r) {
-        lcd_set_cursor(0, r);
-        vTaskDelay(pdMS_TO_TICKS(1));
-        for (int c = 0; c < cols_; ++c) {
-            char s[2] = { ' ', 0 };
-            lcd_write_string(s);
-        }
-        //vTaskDelay(pdMS_TO_TICKS(delay_ms));
-        if (my_token != g_message_token) { Unlock(); return; }
-    }
-
-for (size_t i = rows_; i < lines.size(); ++i) {
-    size_t start = i - rows_ + 1;
-
-    // 1. Draw the “scrolled up” existing lines quickly (no delay)
-    for (int r = 0; r < rows_ - 1; ++r) {
-        const auto &ln = lines[start + r];
-        lcd_set_cursor(0, r);
-        vTaskDelay(pdMS_TO_TICKS(1));
-        for (size_t k = 0; k < ln.size(); ++k) {
-            char s[2] = { ln[k], 0 };
-            lcd_write_string(s);
-            vTaskDelay(pdMS_TO_TICKS(1));
-        }
-        for (int c = (int)ln.size(); c < cols_; ++c)
-        {
-            char s[2] = { ' ', 0 };
-            lcd_write_string(s);
-        }
-        if (my_token != g_message_token) { Unlock(); return; }
-    }
-
-    const auto &ln_new = lines[start + rows_ - 1];
-    lcd_set_cursor(0, rows_ - 1);
-    vTaskDelay(pdMS_TO_TICKS(1));
-    for (size_t k = 0; k < ln_new.size(); ++k) {
-        char s[2] = { ln_new[k], 0 };
-        lcd_write_string(s);
-        vTaskDelay(pdMS_TO_TICKS(delay_ms));
-        if (my_token != g_message_token) { Unlock(); return; }
-    }
-    for (int c = (int)ln_new.size(); c < cols_; ++c)
-    {
-        char s[2] = { ' ', 0 };
-        lcd_write_string(s);
-    }
-    if (my_token != g_message_token) { Unlock(); return; }
-    }
-    Unlock();
+    SendClear();
+    SendShow(filtered.c_str(), 0, 0);
 }
 
 void CharLcdDisplay::SetStatus(const char* status)
 {
     std::string filtered = lcd_filter_text(status ? status : "");
     for (size_t k = 0; k < filtered.size(); ++k) filtered[k] = hd44780_sanitize_char(filtered[k]);
-    if (!Lock(100)) return;
-    g_message_token = + g_message_token + 1;
-    lcd_set_cursor(0, 0);
-    size_t n = std::min<size_t>(filtered.size(), cols_);
-    for (size_t i = 0; i < n; ++i) { char s[2] = { filtered[i], 0 }; lcd_write_string(s); }
-    for (int c = (int)n; c < cols_; ++c) { char s[2] = { ' ', 0 }; lcd_write_string(s); }
-    Unlock();
+    SendShow(filtered.c_str(), 0, 0);
 }
 
 void CharLcdDisplay::ShowNotification(const std::string& notification, int duration_ms)
@@ -233,13 +151,7 @@ void CharLcdDisplay::ShowNotification(const char* notification, int /*duration_m
 {
     std::string filtered = lcd_filter_text(notification ? notification : "");
     for (size_t k = 0; k < filtered.size(); ++k) filtered[k] = hd44780_sanitize_char(filtered[k]);
-    if (!Lock(100)) return;
-    g_message_token = g_message_token + 1;
-    lcd_set_cursor(0, 1);
-    size_t n = std::min<size_t>(filtered.size(), cols_);
-    for (size_t i = 0; i < n; ++i) { char s[2] = { filtered[i], 0 }; lcd_write_string(s); }
-    for (int c = (int)n; c < cols_; ++c) { char s[2] = { ' ', 0 }; lcd_write_string(s); }
-    Unlock();
+    SendShow(filtered.c_str(), 1, 0);
 }
 
 void CharLcdDisplay::SetEmotion(const char* /*emotion*/)
@@ -248,24 +160,94 @@ void CharLcdDisplay::SetEmotion(const char* /*emotion*/)
 
 void CharLcdDisplay::SetPowerSaveMode(bool on)
 {
-    //if (Lock(10)) { lcd_backlight(!on); Unlock(); }
+    (void)on;
 }
 
 void CharLcdDisplay::UpdateStatusBar(bool /*update_all*/)
 {
     auto& app = Application::GetInstance();
     auto curr = app.GetDeviceState();
-    bool on = !(curr == kDeviceStateIdle);
-    //if (Lock(10)) { lcd_backlight(on); Unlock(); }
     if (curr == kDeviceStateIdle) {
         time_t now = time(NULL);
         struct tm* t = localtime(&now);
         char buf[6];
         if (t) { snprintf(buf, sizeof(buf), "%02d:%02d", t->tm_hour, t->tm_min); }
         else { snprintf(buf, sizeof(buf), "--:--"); }
-        if (!Lock(20)) return;
-        lcd_set_cursor(cols_ - 5, rows_ - 1);
-        for (size_t i = 0; i < 5; ++i) { char s[2] = { buf[i], 0 }; lcd_write_string(s); }
-        Unlock();
+        SendShow(buf, rows_ - 1, cols_ - 5);
+    }
+}
+
+void CharLcdDisplay::SendClear() {
+    if (!display_queue_) return;
+    DisplayMsg msg{};
+    msg.text[0] = '\0';
+    msg.row = -100;
+    msg.col = -100;
+    xQueueSend(display_queue_, &msg, 0);
+}
+
+void CharLcdDisplay::SendSetCursor(int row, int col) {
+    if (!display_queue_) return;
+    DisplayMsg msg{};
+    msg.text[0] = '\0';
+    msg.row = row;
+    msg.col = col;
+    xQueueSend(display_queue_, &msg, 0);
+}
+
+void CharLcdDisplay::SendShow(const char* text, int row, int col) {
+    if (!display_queue_ || !text) return;
+    DisplayMsg msg{};
+    msg.row = row;
+    msg.col = col;
+    size_t n = std::min<size_t>(sizeof(msg.text) - 1, std::strlen(text));
+    for (size_t i = 0; i < n; ++i) {
+        msg.text[i] = hd44780_sanitize_char(text[i]);
+    }
+    msg.text[n] = '\0';
+    xQueueSend(display_queue_, &msg, 0);
+}
+
+void CharLcdDisplay::DisplayTask(void* arg) {
+    CharLcdDisplay* self = static_cast<CharLcdDisplay*>(arg);
+    DisplayMsg msg;
+    for (;;) {
+        if (xQueueReceive(self->display_queue_, &msg, portMAX_DELAY) == pdPASS) {
+            if (msg.row == -100 && msg.col == -100) {
+                lcd_clear();
+                self->cursor_row_ = 0;
+                self->cursor_col_ = 0;
+                continue;
+            }
+            if (msg.text[0] == '\0') {
+                if (msg.row >= 0 && msg.row < self->rows_ && msg.col >= 0 && msg.col < self->cols_) {
+                    self->cursor_row_ = msg.row;
+                    self->cursor_col_ = msg.col;
+                    lcd_set_cursor((uint8_t)self->cursor_col_, (uint8_t)self->cursor_row_);
+                }
+                continue;
+            }
+            if (msg.row >= 0 && msg.row < self->rows_ && msg.col >= 0 && msg.col < self->cols_) {
+                self->cursor_row_ = msg.row;
+                self->cursor_col_ = msg.col;
+            }
+            const char* text = msg.text;
+            int count = 0;
+            int max_chars = self->cols_ * self->rows_;
+            while (*text && count < max_chars) {
+                if (self->cursor_row_ >= self->rows_) break;
+                if (self->cursor_col_ >= self->cols_) {
+                    self->cursor_col_ = 0;
+                    self->cursor_row_++;
+                    if (self->cursor_row_ >= self->rows_) break;
+                }
+                lcd_set_cursor((uint8_t)self->cursor_col_, (uint8_t)self->cursor_row_);
+                char s[2] = { *text, 0 };
+                lcd_write_string(s);
+                self->cursor_col_++;
+                text++;
+                count++;
+            }
+        }
     }
 }
