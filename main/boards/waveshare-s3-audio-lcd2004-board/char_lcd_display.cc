@@ -216,7 +216,7 @@ void CharLcdDisplay::SetStatus(const char* status)
     std::string filtered = lcd_filter_text(status ? status : "");
     for (size_t k = 0; k < filtered.size(); ++k) filtered[k] = hd44780_sanitize_char(filtered[k]);
     if (!Lock(100)) return;
-    g_message_token++;
+    g_message_token = + g_message_token + 1;
     lcd_set_cursor(0, 0);
     size_t n = std::min<size_t>(filtered.size(), cols_);
     for (size_t i = 0; i < n; ++i) { char s[2] = { filtered[i], 0 }; lcd_write_string(s); }
@@ -234,7 +234,7 @@ void CharLcdDisplay::ShowNotification(const char* notification, int /*duration_m
     std::string filtered = lcd_filter_text(notification ? notification : "");
     for (size_t k = 0; k < filtered.size(); ++k) filtered[k] = hd44780_sanitize_char(filtered[k]);
     if (!Lock(100)) return;
-    g_message_token++;
+    g_message_token = g_message_token + 1;
     lcd_set_cursor(0, 1);
     size_t n = std::min<size_t>(filtered.size(), cols_);
     for (size_t i = 0; i < n; ++i) { char s[2] = { filtered[i], 0 }; lcd_write_string(s); }
@@ -248,7 +248,7 @@ void CharLcdDisplay::SetEmotion(const char* /*emotion*/)
 
 void CharLcdDisplay::SetPowerSaveMode(bool on)
 {
-    if (Lock(10)) { lcd_backlight(!on); Unlock(); }
+    //if (Lock(10)) { lcd_backlight(!on); Unlock(); }
 }
 
 void CharLcdDisplay::UpdateStatusBar(bool /*update_all*/)
@@ -256,7 +256,7 @@ void CharLcdDisplay::UpdateStatusBar(bool /*update_all*/)
     auto& app = Application::GetInstance();
     auto curr = app.GetDeviceState();
     bool on = !(curr == kDeviceStateIdle);
-    if (Lock(10)) { lcd_backlight(on); Unlock(); }
+    //if (Lock(10)) { lcd_backlight(on); Unlock(); }
     if (curr == kDeviceStateIdle) {
         time_t now = time(NULL);
         struct tm* t = localtime(&now);

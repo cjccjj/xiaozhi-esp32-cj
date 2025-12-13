@@ -24,7 +24,7 @@ public:
     virtual void ShowNotification(const std::string& notification, int duration_ms = 3000) override;
     virtual void SetEmotion(const char* emotion) override;
     virtual void SetChatMessage(const char* role, const char* content) override;
-    virtual void UpdateStatusBar(bool update_all = false) override {}
+    virtual void UpdateStatusBar(bool update_all = false) override;
     virtual void SetPowerSaveMode(bool on) override;
 
 protected:
