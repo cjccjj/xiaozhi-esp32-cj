@@ -137,6 +137,25 @@ void lcd_init(void) {
         ESP_ERROR_CHECK(i2c_send_byte_on_4bits(init_commands[i], LCD_RS_CMD));
         vTaskDelay(pdMS_TO_TICKS(5));
     }
+
+    static const uint8_t frame1[8] = {0x00, 0x00, 0x00, 0x0E, 0x11, 0x11, 0x11, 0x0E}; //o 1
+    static const uint8_t frame2[8] = {0x00, 0x00, 0x0E, 0x11, 0x11, 0x11, 0x0E, 0x00}; //2
+    static const uint8_t frame3[8] = {0x00, 0x0E, 0x11, 0x11, 0x11, 0x0E, 0x00, 0x00}; //3
+    static const uint8_t frame4[8] = {0x0E, 0x11, 0x11, 0x11, 0x0E, 0x00, 0x00, 0x00}; //4
+    const uint8_t* frames[4] = {frame1, frame2, frame3, frame4};
+    for (uint8_t slot = 0; slot < 4; ++slot) {
+        uint8_t addr = (uint8_t)(0x40 | (slot << 3));
+        ESP_ERROR_CHECK(i2c_send_byte_on_4bits(addr, LCD_RS_CMD));
+        vTaskDelay(pdMS_TO_TICKS(5));
+        for (uint8_t row = 0; row < 8; ++row) {
+            ESP_ERROR_CHECK(i2c_send_byte_on_4bits(frames[slot][row], LCD_RS_DATA));
+            vTaskDelay(pdMS_TO_TICKS(5));
+
+        }
+    }
+    ESP_ERROR_CHECK(i2c_send_byte_on_4bits(0x80, LCD_RS_CMD));
+    vTaskDelay(pdMS_TO_TICKS(5));
+
 }
 
 // Set cursor position on the LCD
