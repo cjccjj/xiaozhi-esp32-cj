@@ -165,6 +165,7 @@ void CharLcdDisplay::UpdateStatusBar(bool /*update_all*/)
             snprintf(buf, sizeof(buf), "%4.1fC %4.1f%%", temp, hum); 
             SendShow(buf, rows_ - 1, 0);
         }
+        SendSetCursor(0, 0);
     }    
 }
 

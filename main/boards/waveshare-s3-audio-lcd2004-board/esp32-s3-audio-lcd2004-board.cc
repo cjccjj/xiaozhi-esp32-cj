@@ -49,8 +49,8 @@ private:
                 ESP_LOGW(TAG, "DHT20: Read failed");
             }
 
-            // 2. Wait 5 minutes (300,000ms)
-            vTaskDelay(pdMS_TO_TICKS(300000));
+            // 2. Wait 1 minutes (60,000ms)
+            vTaskDelay(pdMS_TO_TICKS(60000));
         }
     }
     // -------------------------------
