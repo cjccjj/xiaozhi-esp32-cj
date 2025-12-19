@@ -1,6 +1,5 @@
 #include "wifi_board.h"
 #include "codecs/box_audio_codec.h"
-#include "char_lcd_display.h"
 #include "system_reset.h"
 #include "application.h"
 #include "button.h"
@@ -14,6 +13,9 @@
 #include "esp_io_expander_tca95xx_16bit.h"
 #include "esp32_camera.h"
 #include "led/circular_strip.h"
+
+#include "char_lcd_display.h"
+#include "dht20.h"
 
 #define TAG "waveshare_s3_audio_lcd2004_board"
 
@@ -29,8 +31,28 @@ private:
     //i2c_master_bus_handle_t lcd_i2c_bus_;  // I2C1 - LCD 2004 display
     esp_io_expander_handle_t io_expander = NULL;
     CharLcdDisplay* display_;
+    Dht20* dht20_; 
     //Esp32Camera* camera_;
 
+    static void DHT20_Task(void* pvParameters) {
+        CustomBoard* self = static_cast<CustomBoard*>(pvParameters);
+        while (true) {
+            // Read from the sensor (updates internal Dht20 state)
+            if (self->dht20_->Read() == ESP_OK) {
+                // Pull values into the board's public variables
+                self->display_->temp = self->dht20_->GetTemperatureC();
+                self->display_->hum = self->dht20_->GetHumidity();
+                self->display_->sensor_valid = true;
+                ESP_LOGI(TAG, "DHT20: %.1fC, %.1f%%", self->display_->temp, self->display_->hum);
+            } else {
+                self->display_->sensor_valid = false;
+                ESP_LOGW(TAG, "DHT20: Read failed");
+            }
+
+            // 2. Wait 5 minutes (300,000ms)
+            vTaskDelay(pdMS_TO_TICKS(300000));
+        }
+    }
     // -------------------------------
     // Initialize regular I2C (bus 0)
     // -------------------------------
@@ -160,9 +182,9 @@ public:
             4                 // rows
         );
 
-        //InitializeCamera();
-
-        //  GetBacklight()->RestoreBrightness();
+        dht20_ = new Dht20(i2c_bus_);
+        dht20_->Init();
+        xTaskCreate(DHT20_Task, "DHT20_update", 2048, this, 1, NULL);
     }
 
     virtual Led* GetLed() override {
@@ -179,7 +201,7 @@ public:
     virtual Display* GetDisplay() override {
         return display_;
     }
-    
+
     // virtual Backlight* GetBacklight() override {
     //     static PwmBacklight backlight(DISPLAY_BACKLIGHT_PIN, BACKLIGHT_INVERT);
     //     return &backlight;

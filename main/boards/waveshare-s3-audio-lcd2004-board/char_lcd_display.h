@@ -29,6 +29,11 @@ public:
     virtual void SetPowerSaveMode(bool on) override;
     void SetCursor(int row, int col);
 
+    // DHT20 read
+    float temp = 0;
+    float hum = 0;
+    bool sensor_valid = false;
+
 protected:
     virtual bool Lock(int timeout_ms = 0) override { return true; }
     virtual void Unlock() override {}

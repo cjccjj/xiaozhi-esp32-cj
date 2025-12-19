@@ -1,4 +1,5 @@
 #include "char_lcd_display.h"
+
 #include <algorithm>
 #include <cstring>
 #include <string>
@@ -10,6 +11,7 @@
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include <ctime>
+
 
 
 static const char *TAG = "CharLcdDisplay";
@@ -151,14 +153,19 @@ void CharLcdDisplay::UpdateStatusBar(bool /*update_all*/)
 {
     auto& app = Application::GetInstance();
     auto curr = app.GetDeviceState();
+    
     if (curr == kDeviceStateIdle) {
         time_t now = time(NULL);
         struct tm* t = localtime(&now);
-        char buf[6];
+        char buf[12];
         if (t) { snprintf(buf, sizeof(buf), "%02d:%02d", t->tm_hour, t->tm_min); }
         else { snprintf(buf, sizeof(buf), "--:--"); }
         SendShow(buf, rows_ - 1, cols_ - 5);
-    }
+        if (sensor_valid) { 
+            snprintf(buf, sizeof(buf), "%4.1fC %4.1f%%", temp, hum); 
+            SendShow(buf, rows_ - 1, 0);
+        }
+    }    
 }
 
 void CharLcdDisplay::SendClear() {
