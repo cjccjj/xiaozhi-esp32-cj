@@ -1,4 +1,5 @@
 #include "char_lcd_display.h"
+#include "zhtopy.h"
 
 #include <algorithm>
 #include <cstring>
@@ -38,6 +39,21 @@ static std::string lcd_filter_all(const char* content) {
             unsigned char b2 = s[i + 2];
             if ((b1 & 0xC0) == 0x80 && (b2 & 0xC0) == 0x80) {
                 uint32_t cp = ((b0 & 0x0F) << 12) | ((b1 & 0x3F) << 6) | (b2 & 0x3F);
+
+                // Check if it's a Chinese character (CJK Unified Ideographs)
+                if (cp >= 0x4E00 && cp <= 0x9FA5) {
+                    // Extract the 3-byte UTF-8 sequence
+                    std::string chinese_char(&content[i], 3);
+                    
+                    // Convert to pinyin and append
+                    std::string pinyin = ZhToPY::instance().zhToPY(chinese_char);
+                    if (!pinyin.empty()) {
+                        out.append(pinyin);
+                    } else {
+                        out.push_back(' ');  // Fallback for unmapped chars
+                    }
+                } 
+
                 char ch = ' ';
                 if (cp == 0x2018 || cp == 0x2019) ch = '\'';
                 else if (cp == 0x201C || cp == 0x201D) ch = '"';
@@ -93,7 +109,7 @@ CharLcdDisplay::CharLcdDisplay(i2c_port_num_t i2c_port,
     vTaskDelay(pdMS_TO_TICKS(2));
 
     ESP_LOGI(TAG, "LCD initialized successfully");
-
+    
     display_queue_ = xQueueCreate(10, sizeof(DisplayMsg));
     xTaskCreate(&CharLcdDisplay::DisplayTask, "charlcd_display", 3072, this, 5, &display_task_handle_);
 }
@@ -112,11 +128,11 @@ CharLcdDisplay::~CharLcdDisplay()
 
 void CharLcdDisplay::SetChatMessage(const char * /*role*/, const char *content)
 {
-    if (!content) { SendClear(); return; }
-    std::string filtered = lcd_filter_all(content);
+    if (!content) { return; }
+    //std::string filtered = lcd_filter_all(content);
 
     SendClear();
-    SendShow(filtered.c_str(), 0, 0);
+    SendShow(content, 0, 0);
 }
 
 void CharLcdDisplay::SetStatus(const char* status)
@@ -125,8 +141,7 @@ void CharLcdDisplay::SetStatus(const char* status)
         SendAnimation("listening", -1, -1);
         return;
     }
-    std::string filtered = lcd_filter_all(status ? status : "");
-    SendShow(filtered.c_str(), 0, 0);
+    SendShow(status, 0, 0);
 }
 
 void CharLcdDisplay::ShowNotification(const std::string& notification, int duration_ms)
@@ -136,8 +151,7 @@ void CharLcdDisplay::ShowNotification(const std::string& notification, int durat
 
 void CharLcdDisplay::ShowNotification(const char* notification, int /*duration_ms*/)
 {
-    std::string filtered = lcd_filter_all(notification ? notification : "");
-    SendShow(filtered.c_str(), 1, 0);
+    SendShow(notification, 1, 0);
 }
 
 void CharLcdDisplay::SetEmotion(const char* /*emotion*/)
