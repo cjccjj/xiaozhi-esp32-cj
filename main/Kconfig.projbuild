@@ -249,6 +249,9 @@ choice BOARD_TYPE
     config BOARD_TYPE_WAVESHARE_S3_AUDIO_LCD2004_BOARD
         bool "Waveshare ESP32-S3-Audio-Lcd2004-Board"
         depends on IDF_TARGET_ESP32S3
+    config BOARD_TYPE_WAVESHARE_S3_AUDIO_EPAPER37_BOARD
+        bool "Waveshare ESP32-S3-Audio-Epaper37-Board"
+        depends on IDF_TARGET_ESP32S3
     config BOARD_TYPE_WAVESHARE_S3_TOUCH_AMOLED_1_8
         bool "Waveshare ESP32-S3-Touch-AMOLED-1.8"
         depends on IDF_TARGET_ESP32S3

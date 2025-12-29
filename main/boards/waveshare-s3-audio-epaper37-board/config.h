@@ -25,70 +25,97 @@
 
 #define I2C_ADDRESS                 ESP_IO_EXPANDER_I2C_TCA9555_ADDRESS_000
 
-#define DISPLAY_SDA_PIN             I2C_SDA_IO
-#define DISPLAY_SCL_PIN             I2C_SCL_IO
+/*EPD port Init*/
+#define EPD_SPI_NUM        SPI2_HOST
 
-#define DISPLAY_MISO_PIN            GPIO_NUM_8
-#define DISPLAY_MOSI_PIN            GPIO_NUM_9
-#define DISPLAY_SCLK_PIN            GPIO_NUM_4
-#define DISPLAY_CS_PIN              GPIO_NUM_3
-#define DISPLAY_DC_PIN              GPIO_NUM_7
-#define DISPLAY_RESET_PIN           GPIO_NUM_NC
-#define DISPLAY_BACKLIGHT_PIN       GPIO_NUM_5
+#define EPD_DC_PIN    GPIO_NUM_7
+#define EPD_CS_PIN    GPIO_NUM_3
+#define EPD_SCK_PIN   GPIO_NUM_4
+#define EPD_MOSI_PIN  GPIO_NUM_9
+#define EPD_RST_PIN   GPIO_NUM_5
+#define EPD_BUSY_PIN  GPIO_NUM_6
 
-#define DISPLAY_SPI_SCLK_HZ         (20 * 1000 * 1000)
-
-/* Camera pins */
-#define CAMERA_PIN_PWDN     GPIO_NUM_NC
-#define CAMERA_PIN_RESET    GPIO_NUM_NC
-#define CAMERA_PIN_XCLK     GPIO_NUM_43
-#define CAMERA_PIN_SIOD     GPIO_NUM_NC
-#define CAMERA_PIN_SIOC     GPIO_NUM_NC
-
-#define CAMERA_PIN_D7       GPIO_NUM_48
-#define CAMERA_PIN_D6       GPIO_NUM_47
-#define CAMERA_PIN_D5       GPIO_NUM_46
-#define CAMERA_PIN_D4       GPIO_NUM_45
-#define CAMERA_PIN_D3       GPIO_NUM_39
-#define CAMERA_PIN_D2       GPIO_NUM_18
-#define CAMERA_PIN_D1       GPIO_NUM_17
-#define CAMERA_PIN_D0       GPIO_NUM_2
-#define CAMERA_PIN_VSYNC    GPIO_NUM_21
-#define CAMERA_PIN_HREF     GPIO_NUM_1
-#define CAMERA_PIN_PCLK     GPIO_NUM_44
-
-#define XCLK_FREQ_HZ 20000000
-
-
-
-
-#ifdef CONFIG_AUDIO_BOARD_LCD_JD9853
-#define LCD_TYPE_JD9853_SERIAL
-#define DISPLAY_WIDTH   320
-#define DISPLAY_HEIGHT  172
-
-#define DISPLAY_SWAP_XY true
-#define DISPLAY_MIRROR_X false
-#define DISPLAY_MIRROR_Y true
-#define DISPLAY_INVERT_COLOR    true
-#define BACKLIGHT_INVERT false
-#define DISPLAY_OFFSET_X  0
-#define DISPLAY_OFFSET_Y  0
-#endif
-
-#ifdef CONFIG_AUDIO_BOARD_LCD_ST7789
-#define LCD_TYPE_ST7789_SERIAL
-#define DISPLAY_WIDTH   240
-#define DISPLAY_HEIGHT  320
-
-#define DISPLAY_SWAP_XY false
+#define EXAMPLE_LCD_WIDTH   240
+#define EXAMPLE_LCD_HEIGHT  416
+/*EPD end*/
+/*DEV POWER init*/
+// #define EPD_PWR_PIN     GPIO_NUM_6
+// #define Audio_PWR_PIN   GPIO_NUM_42
+// #define VBAT_PWR_PIN    GPIO_NUM_17
+ 
 #define DISPLAY_MIRROR_X false
 #define DISPLAY_MIRROR_Y false
-#define DISPLAY_INVERT_COLOR    true
-#define BACKLIGHT_INVERT false
+#define DISPLAY_SWAP_XY  false
+
 #define DISPLAY_OFFSET_X  0
 #define DISPLAY_OFFSET_Y  0
-#endif
+
+
+
+// #define DISPLAY_SDA_PIN             I2C_SDA_IO
+// #define DISPLAY_SCL_PIN             I2C_SCL_IO
+
+// #define DISPLAY_MISO_PIN            GPIO_NUM_8
+// #define DISPLAY_MOSI_PIN            GPIO_NUM_9
+// #define DISPLAY_SCLK_PIN            GPIO_NUM_4
+// #define DISPLAY_CS_PIN              GPIO_NUM_3
+// #define DISPLAY_DC_PIN              GPIO_NUM_7
+// #define DISPLAY_RESET_PIN           GPIO_NUM_NC
+// #define DISPLAY_BACKLIGHT_PIN       GPIO_NUM_5
+
+// #define DISPLAY_SPI_SCLK_HZ         (20 * 1000 * 1000)
+
+// /* Camera pins */
+// #define CAMERA_PIN_PWDN     GPIO_NUM_NC
+// #define CAMERA_PIN_RESET    GPIO_NUM_NC
+// #define CAMERA_PIN_XCLK     GPIO_NUM_43
+// #define CAMERA_PIN_SIOD     GPIO_NUM_NC
+// #define CAMERA_PIN_SIOC     GPIO_NUM_NC
+
+// #define CAMERA_PIN_D7       GPIO_NUM_48
+// #define CAMERA_PIN_D6       GPIO_NUM_47
+// #define CAMERA_PIN_D5       GPIO_NUM_46
+// #define CAMERA_PIN_D4       GPIO_NUM_45
+// #define CAMERA_PIN_D3       GPIO_NUM_39
+// #define CAMERA_PIN_D2       GPIO_NUM_18
+// #define CAMERA_PIN_D1       GPIO_NUM_17
+// #define CAMERA_PIN_D0       GPIO_NUM_2
+// #define CAMERA_PIN_VSYNC    GPIO_NUM_21
+// #define CAMERA_PIN_HREF     GPIO_NUM_1
+// #define CAMERA_PIN_PCLK     GPIO_NUM_44
+
+// #define XCLK_FREQ_HZ 20000000
+
+
+
+
+// #ifdef CONFIG_AUDIO_BOARD_LCD_JD9853
+// #define LCD_TYPE_JD9853_SERIAL
+// #define DISPLAY_WIDTH   320
+// #define DISPLAY_HEIGHT  172
+
+// #define DISPLAY_SWAP_XY true
+// #define DISPLAY_MIRROR_X false
+// #define DISPLAY_MIRROR_Y true
+// #define DISPLAY_INVERT_COLOR    true
+// #define BACKLIGHT_INVERT false
+// #define DISPLAY_OFFSET_X  0
+// #define DISPLAY_OFFSET_Y  0
+// #endif
+
+// #ifdef CONFIG_AUDIO_BOARD_LCD_ST7789
+// #define LCD_TYPE_ST7789_SERIAL
+// #define DISPLAY_WIDTH   240
+// #define DISPLAY_HEIGHT  320
+
+// #define DISPLAY_SWAP_XY false
+// #define DISPLAY_MIRROR_X false
+// #define DISPLAY_MIRROR_Y false
+// #define DISPLAY_INVERT_COLOR    true
+// #define BACKLIGHT_INVERT false
+// #define DISPLAY_OFFSET_X  0
+// #define DISPLAY_OFFSET_Y  0
+// #endif
 
 
 
