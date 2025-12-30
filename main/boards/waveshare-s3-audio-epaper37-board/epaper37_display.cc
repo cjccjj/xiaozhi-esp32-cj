@@ -16,21 +16,37 @@ void Epaper37Display::lvgl_flush_cb(lv_display_t *disp, const lv_area_t *area, u
     Epaper37Display *driver = (Epaper37Display *)lv_display_get_user_data(disp);
     uint16_t *rgb_buffer = (uint16_t *)color_p;
 
-    // For E-paper, we usually refresh the whole screen if we are in FULL RENDER MODE
-    // The 3.7" E-paper requires the full image to be sent to registers 0x10 and 0x13
+    // According to STM32 example main.c:
+    // while(1) { EPD_PartInit(); ... EPD_Display(); EPD_Update(); delay; }
+    // We call EPD_PartInit() here to ensure the hardware is in the correct state for partial update.
+    driver->EPD_PartInit();
     
-    // Convert RGB565 to 1-bit B/W
+    // Convert RGB565 to 1-bit B/W using luminance threshold
     for (int y = 0; y < driver->Height; y++) {
         for (int x = 0; x < driver->Width; x++) {
-            // Simple thresholding: if it's bright enough, it's white (1), otherwise black (0)
-            // RGB565: R5 G6 B5. 0x7FFF is about mid-gray.
             uint16_t color = rgb_buffer[y * driver->Width + x];
-            uint8_t bw_color = (color > 0x7BEF) ? DRIVER_COLOR_WHITE : DRIVER_COLOR_BLACK;
+            
+            // Extract RGB components from RGB565
+            uint8_t r = (color >> 11) & 0x1F; // 5 bits
+            uint8_t g = (color >> 5) & 0x3F;  // 6 bits
+            uint8_t b = color & 0x1F;         // 5 bits
+            
+            // Convert to 0-255 range
+            uint16_t r8 = (r * 255) / 31;
+            uint16_t g8 = (g * 255) / 63;
+            uint16_t b8 = (b * 255) / 31;
+            
+            // Calculate luminance: Y = 0.299R + 0.587G + 0.114B
+            // Integer math: (r*76 + g*150 + b*29) >> 8
+            uint16_t luminance = (r8 * 76 + g8 * 150 + b8 * 29) >> 8;
+            
+            // Use 128 as threshold for B/W
+            uint8_t bw_color = (luminance > 128) ? DRIVER_COLOR_WHITE : DRIVER_COLOR_BLACK;
             driver->EPD_DrawColorPixel(x, y, bw_color);
         }
     }
 
-    // Refresh the display
+    // Refresh the display (EPD_Display calls EPD_Update)
     driver->EPD_Display(driver->buffer);
     
     lv_display_flush_ready(disp);
@@ -38,8 +54,9 @@ void Epaper37Display::lvgl_flush_cb(lv_display_t *disp, const lv_area_t *area, u
 
 Epaper37Display::Epaper37Display(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_t panel,
                                int width, int height, int offset_x, int offset_y,
-                               bool mirror_x, bool mirror_y, bool swap_xy, epaper37_spi_t _spi_data)
-    : LcdDisplay(panel_io, panel, width, height), spi_data(_spi_data), Width(width), Height(height) {
+                               bool _mirror_x, bool _mirror_y, bool _swap_xy, epaper37_spi_t _spi_data)
+    : LcdDisplay(panel_io, panel, width, height), spi_data(_spi_data), 
+      Width(width), Height(height), mirror_x(_mirror_x), mirror_y(_mirror_y), swap_xy(_swap_xy) {
 
     ESP_LOGI(TAG, "Initialize SPI");
     spi_port_init();
@@ -174,12 +191,17 @@ void Epaper37Display::writeBytes(const uint8_t *data, int len) {
     set_cs_1();
 }
 
-void Epaper37Display::EPD_Init() {
+void Epaper37Display::EPD_HW_RESET() {
+    vTaskDelay(pdMS_TO_TICKS(100));
     set_rst_0();
     vTaskDelay(pdMS_TO_TICKS(20));
     set_rst_1();
     vTaskDelay(pdMS_TO_TICKS(20));
     read_busy();
+}
+
+void Epaper37Display::EPD_Init() {
+    EPD_HW_RESET();
 
     EPD_SendCommand(0x00);
     EPD_SendData(0x1B);
@@ -200,11 +222,7 @@ void Epaper37Display::EPD_DeepSleep() {
 }
 
 void Epaper37Display::EPD_PartInit() {
-    set_rst_0();
-    vTaskDelay(pdMS_TO_TICKS(20));
-    set_rst_1();
-    vTaskDelay(pdMS_TO_TICKS(20));
-    read_busy();
+    EPD_HW_RESET();
 
     EPD_SendCommand(0x00);
     EPD_SendData(0x1B);
@@ -215,11 +233,7 @@ void Epaper37Display::EPD_PartInit() {
 }
 
 void Epaper37Display::EPD_FastInit() {
-    set_rst_0();
-    vTaskDelay(pdMS_TO_TICKS(20));
-    set_rst_1();
-    vTaskDelay(pdMS_TO_TICKS(20));
-    read_busy();
+    EPD_HW_RESET();
 
     EPD_SendCommand(0x00);
     EPD_SendData(0x1B);
@@ -267,12 +281,29 @@ void Epaper37Display::EPD_Clear() {
 }
 
 void Epaper37Display::EPD_DrawColorPixel(uint16_t x, uint16_t y, uint8_t color) {
-    if (x >= Width || y >= Height) return;
+    uint16_t _x = x;
+    uint16_t _y = y;
+
+    if (swap_xy) {
+        uint16_t tmp = _x;
+        _x = _y;
+        _y = tmp;
+    }
+
+    if (mirror_x) {
+        _x = Width - 1 - _x;
+    }
+
+    if (mirror_y) {
+        _y = Height - 1 - _y;
+    }
+
+    if (_x >= Width || _y >= Height) return;
 
     // 240x416 resolution. Width is 240 bits (30 bytes).
     // index = y * (Width/8) + (x/8)
-    uint16_t index = y * (Width / 8) + (x / 8);
-    uint8_t bit = 7 - (x % 8);
+    uint16_t index = _y * (Width / 8) + (_x / 8);
+    uint8_t bit = 7 - (_x % 8);
 
     if (color == DRIVER_COLOR_WHITE) {
         buffer[index] |= (1 << bit);

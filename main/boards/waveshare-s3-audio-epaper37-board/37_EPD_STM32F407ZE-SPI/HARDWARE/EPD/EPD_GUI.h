@@ -17,35 +17,35 @@ typedef struct {
 }PAINT;
 extern PAINT Paint;
 
-//¶¨ÒåE-PaperÏÔÊ¾·½Ïò 
+//å®šä¹‰E-Paperæ˜¾ç¤ºæ–¹å‘ 
 /*******************
-Rotaion:0-0¶È·½Ïò
-Rotaion:90-90¶È·½Ïò
-Rotaion:180-180¶È·½Ïò
-Rotaion:270-270¶È·½Ïò
+Rotaion:0-0åº¦æ–¹å‘
+Rotaion:90-90åº¦æ–¹å‘
+Rotaion:180-180åº¦æ–¹å‘
+Rotaion:270-270åº¦æ–¹å‘
 *******************/
 #define Rotation 0  
 
 
-void Paint_NewImage(u8 *image,u16 Width,u16 Height,u16 Rotate,u16 Color); 					 //´´½¨»­²¼¿ØÖÆÏÔÊ¾·½Ïò
+void Paint_NewImage(u8 *image,u16 Width,u16 Height,u16 Rotate,u16 Color); 					 //åˆ›å»ºç”»å¸ƒæ§åˆ¶æ˜¾ç¤ºæ–¹å‘
 void Paint_SetPixel(u16 Xpoint,u16 Ypoint,u16 Color);
 void Paint_Clear(u8 Color);
 void EPD_DrawLine(u16 Xstart,u16 Ystart,u16 Xend,u16 Yend,u16 Color);
-void EPD_DrawRectangle(u16 Xstart,u16 Ystart,u16 Xend,u16 Yend,u16 Color,u8 mode);  //»­¾ØĞÎ
-void EPD_DrawCircle(u16 X_Center,u16 Y_Center,u16 Radius,u16 Color,u8 mode);        //»­Ô²
-void EPD_ShowChar(u16 x,u16 y,u16 chr,u16 size1,u16 color);                         //ÏÔÊ¾×Ö·û
-void EPD_ShowString(u16 x,u16 y,u8 *chr,u16 size1,u16 color);                       //ÏÔÊ¾×Ö·û´®
-void EPD_ShowNum(u16 x,u16 y,u32 num,u16 len,u16 size1,u16 color);                  //ÏÔÊ¾Êı×Ö
-void EPD_ShowPicture(u16 x,u16 y,u16 sizex,u16 sizey,const u8 BMP[],u16 Color);			//ÏÔÊ¾Í¼Æ¬      
+void EPD_DrawRectangle(u16 Xstart,u16 Ystart,u16 Xend,u16 Yend,u16 Color,u8 mode);  //ç”»çŸ©å½¢
+void EPD_DrawCircle(u16 X_Center,u16 Y_Center,u16 Radius,u16 Color,u8 mode);        //ç”»åœ†
+void EPD_ShowChar(u16 x,u16 y,u16 chr,u16 size1,u16 color);                         //æ˜¾ç¤ºå­—ç¬¦
+void EPD_ShowString(u16 x,u16 y,u8 *chr,u16 size1,u16 color);                       //æ˜¾ç¤ºå­—ç¬¦ä¸²
+void EPD_ShowNum(u16 x,u16 y,u32 num,u16 len,u16 size1,u16 color);                  //æ˜¾ç¤ºæ•°å­—
+void EPD_ShowPicture(u16 x,u16 y,u16 sizex,u16 sizey,const u8 BMP[],u16 Color);			//æ˜¾ç¤ºå›¾ç‰‡      
 void EPD_ClearWindows(u16 xs,u16 ys,u16 xe,u16 ye,u16 color);
 void EPD_ShowFloatNum1(u16 x,u16 y,float num,u8 len,u8 pre,u8 sizey,u8 color);
 void EPD_ShowWatch(u16 x,u16 y,float num,u8 len,u8 pre,u8 sizey,u8 color);
 
-void EPD_ShowChinese(u16 x,u16 y,u8 *s,u8 sizey,u16 color);//ÏÔÊ¾ºº×Ö´®
-void EPD_ShowChinese12x12(u16 x,u16 y,u8 *s,u8 sizey,u16 color);//ÏÔÊ¾µ¥¸ö12x12ºº×Ö
-void EPD_ShowChinese16x16(u16 x,u16 y,u8 *s,u8 sizey,u16 color);//ÏÔÊ¾µ¥¸ö16x16ºº×Ö
-void EPD_ShowChinese24x24(u16 x,u16 y,u8 *s,u8 sizey,u16 color);//ÏÔÊ¾µ¥¸ö24x24ºº×Ö
-void EPD_ShowChinese32x32(u16 x,u16 y,u8 *s,u8 sizey,u16 color);//ÏÔÊ¾µ¥¸ö32x32ºº×Ö
+void EPD_ShowChinese(u16 x,u16 y,u8 *s,u8 sizey,u16 color);//æ˜¾ç¤ºæ±‰å­—ä¸²
+void EPD_ShowChinese12x12(u16 x,u16 y,u8 *s,u8 sizey,u16 color);//æ˜¾ç¤ºå•ä¸ª12x12æ±‰å­—
+void EPD_ShowChinese16x16(u16 x,u16 y,u8 *s,u8 sizey,u16 color);//æ˜¾ç¤ºå•ä¸ª16x16æ±‰å­—
+void EPD_ShowChinese24x24(u16 x,u16 y,u8 *s,u8 sizey,u16 color);//æ˜¾ç¤ºå•ä¸ª24x24æ±‰å­—
+void EPD_ShowChinese32x32(u16 x,u16 y,u8 *s,u8 sizey,u16 color);//æ˜¾ç¤ºå•ä¸ª32x32æ±‰å­—
 
 
 #endif

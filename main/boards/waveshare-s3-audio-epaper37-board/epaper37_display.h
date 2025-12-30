@@ -32,6 +32,7 @@ public:
     void EPD_Init();
     void EPD_Update();
     void EPD_DeepSleep();
+    void EPD_HW_RESET();
     void EPD_PartInit();
     void EPD_FastInit();
     void EPD_Display(const uint8_t *image);
@@ -42,6 +43,9 @@ private:
     const epaper37_spi_t spi_data;
     const int Width;
     const int Height;
+    const bool mirror_x;
+    const bool mirror_y;
+    const bool swap_xy;
     spi_device_handle_t spi;
     uint8_t *buffer = nullptr;
     uint8_t *old_buffer = nullptr;
