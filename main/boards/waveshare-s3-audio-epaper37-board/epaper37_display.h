@@ -40,7 +40,7 @@ public:
     void EPD_FastInit();
     void EPD_Display(const uint8_t *image);
     void EPD_Clear();
-    void EPD_DrawColorPixel(uint16_t x, uint16_t y, uint8_t color);
+    bool EPD_DrawColorPixel(uint16_t x, uint16_t y, uint8_t color);
 
 private:
     const epaper37_spi_t spi_data;

@@ -15,22 +15,24 @@
 
 void Epaper37Display::lvgl_flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *color_p) {
     Epaper37Display *driver = (Epaper37Display *)lv_display_get_user_data(disp);
-    uint16_t         *buffer = (uint16_t *) color_p;
-
-    // According to STM32 example main.c:
-    // while(1) { EPD_PartInit(); ... EPD_Display(); EPD_Update(); delay; }
-    driver->EPD_PartInit();
+    uint16_t         *pixel_p = (uint16_t *) color_p;
+    bool changed = false;
     
     for (int y = area->y1; y <= area->y2; y++) {
         for (int x = area->x1; x <= area->x2; x++) {
-            uint8_t color = (*buffer < 0x7fff) ? DRIVER_COLOR_BLACK : DRIVER_COLOR_WHITE;
-            driver->EPD_DrawColorPixel(x, y, color);
-            buffer++;
+            uint8_t color = (*pixel_p < 0x7fff) ? DRIVER_COLOR_BLACK : DRIVER_COLOR_WHITE;
+            if (driver->EPD_DrawColorPixel(x, y, color)) {
+                changed = true;
+            }
+            pixel_p++;
         }
     }
 
-    // Refresh the display
-    driver->EPD_Display(driver->buffer);
+    // Only refresh the physical display if something actually changed
+    if (changed) {
+        driver->EPD_PartInit();
+        driver->EPD_Display(driver->buffer);
+    }
     
     lv_display_flush_ready(disp);
 }
@@ -185,6 +187,7 @@ void Epaper37Display::EPD_HW_RESET() {
 }
 
 void Epaper37Display::EPD_Init() {
+    ESP_LOGI(TAG, "EPD Full Init");
     EPD_HW_RESET();
     read_busy();
 
@@ -193,6 +196,7 @@ void Epaper37Display::EPD_Init() {
 }
 
 void Epaper37Display::EPD_Update() {
+    ESP_LOGI(TAG, "EPD Refreshing Display...");
     EPD_SendCommand(0x04); // Power ON
     read_busy();
     EPD_SendCommand(0x12); // Display Refresh
@@ -207,6 +211,7 @@ void Epaper37Display::EPD_DeepSleep() {
 }
 
 void Epaper37Display::EPD_PartInit() {
+    ESP_LOGI(TAG, "EPD Partial Init");
     EPD_HW_RESET();
     read_busy();
 
@@ -219,6 +224,7 @@ void Epaper37Display::EPD_PartInit() {
 }
 
 void Epaper37Display::EPD_FastInit() {
+    ESP_LOGI(TAG, "EPD Fast Init");
     EPD_HW_RESET();
     read_busy();
 
@@ -248,6 +254,7 @@ void Epaper37Display::EPD_Display(const uint8_t *image) {
 }
 
 void Epaper37Display::EPD_Clear() {
+    ESP_LOGI(TAG, "EPD Clearing Screen (Full)");
     int data_len = PANEL_WIDTH * PANEL_HEIGHT / 8;
     // Clear hardware display to white
     memset(buffer, 0xFF, PANEL_BUFFER_SIZE);
@@ -267,13 +274,13 @@ void Epaper37Display::EPD_Clear() {
     memset(buffer, 0xFF, PANEL_BUFFER_SIZE);
 }
 
-void Epaper37Display::EPD_DrawColorPixel(uint16_t x, uint16_t y, uint8_t color) {
+bool Epaper37Display::EPD_DrawColorPixel(uint16_t x, uint16_t y, uint8_t color) {
     // LVGL coordinates (x, y) where x is [0, 415] and y is [0, 239]
     // We want 90-degree clockwise rotation to physical panel (240x416)
     // Physical X = (PANEL_WIDTH - 1) - y = 239 - y
     // Physical Y = x
     
-    if (x >= Width || y >= Height) return;
+    if (x >= Width || y >= Height) return false;
 
     uint16_t _x = (PANEL_WIDTH - 1) - y;
     uint16_t _y = x;
@@ -291,16 +298,19 @@ void Epaper37Display::EPD_DrawColorPixel(uint16_t x, uint16_t y, uint8_t color) 
         _y = tmp;
     }
 
-    if (_x >= PANEL_WIDTH || _y >= PANEL_HEIGHT) return;
+    if (_x >= PANEL_WIDTH || _y >= PANEL_HEIGHT) return false;
 
     // 240x416 resolution. Physical Width is 240 bits (30 bytes).
     // index = y * (PANEL_WIDTH/8) + (x/8)
     uint16_t index = _y * (PANEL_WIDTH / 8) + (_x / 8);
     uint8_t bit = 7 - (_x % 8);
 
+    uint8_t old_val = buffer[index];
     if (color == DRIVER_COLOR_WHITE) {
         buffer[index] |= (1 << bit);
     } else {
         buffer[index] &= ~(1 << bit);
     }
+
+    return old_val != buffer[index];
 }
