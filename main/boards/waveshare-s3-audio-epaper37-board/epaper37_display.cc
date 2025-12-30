@@ -6,7 +6,7 @@
 #include "board.h"
 #include "config.h"
 #include "esp_lvgl_port.h"
-#include "lvgl_theme.h"
+// #include "lvgl_theme.h"
 
 #define TAG "Epaper37Display"
 
@@ -92,22 +92,22 @@ Epaper37Display::Epaper37Display(esp_lcd_panel_io_handle_t panel_io, esp_lcd_pan
     ESP_LOGI(TAG, "UI start");
     SetupUI();
 
-    // Force 30px font on all UI elements
-    {
-        DisplayLockGuard lock(this);
-        auto lvgl_theme = static_cast<LvglTheme*>(current_theme_);
-        auto text_font = lvgl_theme->text_font()->font();
-        auto large_icon_font = lvgl_theme->large_icon_font()->font();
+    // // Force 30px font on all UI elements
+    // {
+    //     DisplayLockGuard lock(this);
+    //     auto lvgl_theme = static_cast<LvglTheme*>(current_theme_);
+    //     auto text_font = lvgl_theme->text_font()->font();
+    //     auto large_icon_font = lvgl_theme->large_icon_font()->font();
         
-        if (status_label_) lv_obj_set_style_text_font(status_label_, text_font, 0);
-        if (notification_label_) lv_obj_set_style_text_font(notification_label_, text_font, 0);
-        if (network_label_) lv_obj_set_style_text_font(network_label_, large_icon_font, 0);
-        if (mute_label_) lv_obj_set_style_text_font(mute_label_, large_icon_font, 0);
-        if (battery_label_) lv_obj_set_style_text_font(battery_label_, large_icon_font, 0);
-        if (low_battery_label_) lv_obj_set_style_text_font(low_battery_label_, text_font, 0);
-        if (emoji_label_) lv_obj_set_style_text_font(emoji_label_, large_icon_font, 0);
-        if (content_) lv_obj_set_style_text_font(content_, text_font, 0);
-    }
+    //     if (status_label_) lv_obj_set_style_text_font(status_label_, text_font, 0);
+    //     if (notification_label_) lv_obj_set_style_text_font(notification_label_, text_font, 0);
+    //     if (network_label_) lv_obj_set_style_text_font(network_label_, large_icon_font, 0);
+    //     if (mute_label_) lv_obj_set_style_text_font(mute_label_, large_icon_font, 0);
+    //     if (battery_label_) lv_obj_set_style_text_font(battery_label_, large_icon_font, 0);
+    //     if (low_battery_label_) lv_obj_set_style_text_font(low_battery_label_, text_font, 0);
+    //     if (emoji_label_) lv_obj_set_style_text_font(emoji_label_, large_icon_font, 0);
+    //     if (content_) lv_obj_set_style_text_font(content_, text_font, 0);
+    // }
 }
 
 Epaper37Display::~Epaper37Display() {
