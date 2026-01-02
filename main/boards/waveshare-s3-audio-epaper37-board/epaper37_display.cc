@@ -34,6 +34,7 @@ void Epaper37Display::lvgl_flush_cb(lv_display_t *disp, const lv_area_t *area, u
     if (changed) {
         driver->EPD_PartInit();
         driver->EPD_Display(driver->buffer);
+        driver->EPD_Update();
     }
     
     lv_display_flush_ready(disp);
@@ -305,9 +306,6 @@ void Epaper37Display::EPD_Display(const uint8_t *image) {
     // Send new image
     EPD_SendCommand(0x13);
     writeBytes(image, data_len);
-
-    // Update hardware
-    EPD_Update();
 
     // Update local old buffer
     memcpy(old_buffer, image, data_len);
