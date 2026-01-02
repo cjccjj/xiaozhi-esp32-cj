@@ -6,7 +6,7 @@
 #include "board.h"
 #include "config.h"
 #include "esp_lvgl_port.h"
-// #include "lvgl_theme.h"
+#include "lvgl_theme.h"
 
 #define TAG "Epaper37Display"
 
@@ -21,7 +21,8 @@ void Epaper37Display::lvgl_flush_cb(lv_display_t *disp, const lv_area_t *area, u
     
     for (int y = area->y1; y <= area->y2; y++) {
         for (int x = area->x1; x <= area->x2; x++) {
-            uint8_t color = (*pixel_p < 0x7fff) ? DRIVER_COLOR_BLACK : DRIVER_COLOR_WHITE;
+            uint8_t color = (*pixel_p < 0x7fff) ? DRIVER_COLOR_BLACK : DRIVER_COLOR_WHITE; // %50 bright            
+            //uint8_t color = (*pixel_p <  0xFC00) ? DRIVER_COLOR_BLACK : DRIVER_COLOR_WHITE; //99% 
             if (driver->EPD_DrawColorPixel(x, y, color)) {
                 changed = true;
             }
@@ -92,22 +93,63 @@ Epaper37Display::Epaper37Display(esp_lcd_panel_io_handle_t panel_io, esp_lcd_pan
     ESP_LOGI(TAG, "UI start");
     SetupUI();
 
-    // // Force 30px font on all UI elements
-    // {
-    //     DisplayLockGuard lock(this);
-    //     auto lvgl_theme = static_cast<LvglTheme*>(current_theme_);
-    //     auto text_font = lvgl_theme->text_font()->font();
-    //     auto large_icon_font = lvgl_theme->large_icon_font()->font();
+    // Standard style layout customizations
+    {
+        DisplayLockGuard lock(this);
         
-    //     if (status_label_) lv_obj_set_style_text_font(status_label_, text_font, 0);
-    //     if (notification_label_) lv_obj_set_style_text_font(notification_label_, text_font, 0);
-    //     if (network_label_) lv_obj_set_style_text_font(network_label_, large_icon_font, 0);
-    //     if (mute_label_) lv_obj_set_style_text_font(mute_label_, large_icon_font, 0);
-    //     if (battery_label_) lv_obj_set_style_text_font(battery_label_, large_icon_font, 0);
-    //     if (low_battery_label_) lv_obj_set_style_text_font(low_battery_label_, text_font, 0);
-    //     if (emoji_label_) lv_obj_set_style_text_font(emoji_label_, large_icon_font, 0);
-    //     if (content_) lv_obj_set_style_text_font(content_, text_font, 0);
-    // }
+        // 1. Top bar: WiFi far right, Mute/Battery to its left
+        if (top_bar_ && network_label_ && mute_label_) {
+            lv_obj_t* right_icons = lv_obj_get_parent(mute_label_);
+            if (right_icons) {
+                // Ensure flex alignment pushes everything to the right
+                lv_obj_set_flex_align(top_bar_, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+                
+                // Order: right_icons (Mute/Battery) then network_label_ (WiFi)
+                lv_obj_move_to_index(right_icons, 0);
+                lv_obj_move_to_index(network_label_, 1);
+                
+                // Add spacing between the two groups if needed
+                auto lvgl_theme = static_cast<LvglTheme*>(current_theme_);
+                lv_obj_set_style_margin_left(network_label_, lvgl_theme->spacing(2), 0);
+            }
+        }
+
+        // 2. Status overlay: Align to top-left of screen with same padding as top_bar
+        if (status_bar_) {
+            auto lvgl_theme = static_cast<LvglTheme*>(current_theme_);
+            lv_obj_set_style_pad_top(status_bar_, lvgl_theme->spacing(2), 0);
+            lv_obj_set_style_pad_bottom(status_bar_, lvgl_theme->spacing(2), 0);
+            lv_obj_set_style_pad_left(status_bar_, lvgl_theme->spacing(4), 0);
+            lv_obj_set_style_pad_right(status_bar_, lvgl_theme->spacing(4), 0);
+
+            lv_obj_set_style_align(status_bar_, LV_ALIGN_TOP_LEFT, 0);
+            lv_obj_align(status_bar_, LV_ALIGN_TOP_LEFT, 0, 0);
+            
+            // Adjust label alignments inside status_bar_
+            if (status_label_) {
+                lv_obj_set_style_text_align(status_label_, LV_TEXT_ALIGN_LEFT, 0);
+                lv_obj_align(status_label_, LV_ALIGN_LEFT_MID, 0, 0);
+            }
+            if (notification_label_) {
+                lv_obj_set_style_text_align(notification_label_, LV_TEXT_ALIGN_LEFT, 0);
+                lv_obj_align(notification_label_, LV_ALIGN_LEFT_MID, 0, 0);
+            }
+        }
+
+        // 3. Emoji Box: 100x100, below top_bar, centered content
+        if (emoji_box_) {
+            lv_obj_set_size(emoji_box_, 100, 100);
+            lv_obj_align_to(emoji_box_, top_bar_, LV_ALIGN_OUT_BOTTOM_MID, 0, 0);
+            
+            if (emoji_image_) {
+                lv_obj_center(emoji_image_);
+            }
+            if (emoji_label_) {
+                lv_obj_set_style_text_align(emoji_label_, LV_TEXT_ALIGN_CENTER, 0);
+                lv_obj_center(emoji_label_);
+            }
+        }
+    }
 }
 
 Epaper37Display::~Epaper37Display() {
